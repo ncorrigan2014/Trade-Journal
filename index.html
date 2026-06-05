@@ -61,7 +61,8 @@
   .eq-tooltip { position: absolute; background: #0d1016; border: 1px solid rgba(255,255,255,.15); border-radius: 7px; padding: 7px 11px; font-size: 10px; pointer-events: none; display: none; white-space: nowrap; z-index: 10; }
   .eq-tooltip-val { font-weight: 700; font-size: 13px; }
   .eq-tooltip-meta { color: #5a6278; margin-top: 2px; font-size: 9px; }
-  .insight-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px; }
+  .insight-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
+  .chip-tf { font-size: 9px; color: #8090b0; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); padding: 3px 8px; border-radius: 4px; font-weight: 700; }
   .insight-card { background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.07); border-radius: 10px; padding: 14px 18px; }
   .insight-label { font-size: 8px; color: #5a6278; letter-spacing: .18em; margin-bottom: 8px; }
   .insight-row { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -80,11 +81,16 @@
   .time-analysis { background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.07); border-radius: 10px; padding: 14px 18px; margin-bottom: 22px; }
   .time-analysis-label { font-size: 8px; color: #5a6278; letter-spacing: .18em; margin-bottom: 12px; }
   .time-buckets { display: flex; gap: 6px; flex-wrap: wrap; }
-  .time-bucket { display: flex; flex-direction: column; align-items: center; gap: 4px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 8px 10px; min-width: 80px; flex: 1; transition: border-color .15s; }
+  .time-bucket { display: flex; flex-direction: column; align-items: center; gap: 4px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 8px 10px; min-width: 80px; flex: 1; transition: all .15s; cursor: pointer; }
+  .time-bucket:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.07); }
   .time-bucket.tb-hot { border-color: rgba(0,255,136,.3); background: rgba(0,255,136,.05); }
   .time-bucket.tb-cold { border-color: rgba(255,59,92,.25); background: rgba(255,59,92,.04); }
   .time-bucket.tb-neutral { border-color: rgba(255,255,255,.08); }
-  .time-bucket.tb-empty { opacity: .35; }
+  .time-bucket.tb-empty { opacity: .35; cursor: default; }
+  .time-bucket.tb-active { border-color: #00ff88 !important; background: rgba(0,255,136,.12) !important; box-shadow: 0 0 0 1px rgba(0,255,136,.3); }
+  .insight-chip-btn { cursor: pointer; transition: all .15s; }
+  .insight-chip-btn:hover { opacity: .8; transform: translateY(-1px); }
+  .insight-chip-btn.tf-active { box-shadow: 0 0 0 2px rgba(0,255,136,.5); transform: translateY(-1px); }
   .tb-window { font-size: 8px; color: #5a6278; letter-spacing: .06em; white-space: nowrap; }
   .tb-wr { font-size: 13px; font-weight: 700; }
   .tb-record { font-size: 8px; color: #5a6278; white-space: nowrap; }
@@ -214,7 +220,7 @@
   .btn-submit { flex: 2; background: #00ff88; border: none; border-radius: 8px; color: #000; padding: 12px; cursor: pointer; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: .06em; transition: opacity .15s; }
   .btn-submit:hover { opacity: .88; }
   .be-note { font-size: 10px; color: #7080a0; background: rgba(255,215,0,.06); border: 1px solid rgba(255,215,0,.15); border-radius: 6px; padding: 8px 12px; margin-top: 8px; line-height: 1.5; }
-  @media (max-width: 900px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px) { .stats { grid-template-columns: repeat(3, 1fr); } .insight-bar { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 640px) { .stats { grid-template-columns: repeat(2, 1fr); } .insight-bar { grid-template-columns: 1fr; } .form-grid, .mistake-grid { grid-template-columns: 1fr; } .period-label { min-width: 100px; font-size: 13px; } }
 </style>
 </head>
@@ -349,6 +355,13 @@
       </div>
       <div class="form-group"><label class="form-label">TIME IN TRADE</label><input class="form-input" type="text" id="f-duration" placeholder="e.g. 12m, 1h 30m"></div>
       <div class="form-group"><label class="form-label">ENTRY TIME (EST)</label><input class="form-input" type="time" id="f-entrytime"></div>
+      <div class="form-group"><label class="form-label">TIMEFRAME</label>
+        <div class="toggle-group">
+          <button class="toggle-btn" id="btn-tf-1m" onclick="setTimeframe('1m')">1m</button>
+          <button class="toggle-btn" id="btn-tf-3m" onclick="setTimeframe('3m')">3m</button>
+          <button class="toggle-btn" id="btn-tf-5m" onclick="setTimeframe('5m')">5m</button>
+        </div>
+      </div>
       <div class="form-group"><label class="form-label">EMOTION</label>
         <select class="form-select" id="f-emotion"><option>Calm</option><option>FOMO</option><option>Revenge</option><option>Anxious</option><option>Overconfident</option><option>Hesitant</option><option>Bored</option><option>Disciplined</option></select>
       </div>
@@ -407,13 +420,13 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://kxgkfkezsaxzdtlrkkpu.supabase.co';
+const SUPABASE_URL = 'https://kxgkfkezsaxzdtlrkkpu.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4Z2tma2V6c2F4emR0bHJra3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTM3OTcsImV4cCI6MjA5MzYyOTc5N30.NuiOwW4rmvZjtdbFTYyd9aQLt5MZMf5JRYL8JaYp2lw';
 // ═══════════════════════════════════════════════════════════════════
 
 const DB_ID = 'main';
 let trades=[], currentView='table', currentFilter='all';
-let editingId=null, formChecks={}, formResult='win', formDirection='long', formMistake=false;
+let editingId=null, formChecks={}, formResult='win', formDirection='long', formMistake=false, formTimeframe='';
 let periodMode='month', periodOffset=0, eqFilter='all';
 const CHECKS=['htfPOI','liquiditySweep','cisd','validSession','aPlusSetup','followedPlan'];
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -454,8 +467,8 @@ function toggleExportMenu(){document.getElementById('export-menu').classList.tog
 document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))document.getElementById('export-menu').classList.remove('open');});
 function exportJSON(){const b=new Blob([JSON.stringify(trades,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='trade_journal_backup.json';a.click();document.getElementById('export-menu').classList.remove('open');}
 function exportCSV(){
-  const h=['Date','Day','Instrument','Direction','Trade#','Contracts','Risk($)','RMultiple','Result','P&L($)','CheckScore','HTF_POI','LiqSweep','CISD','ValidSession','APlus','FollowedPlan','Emotion','Duration','HadMistake','MistakeType','MistakeNotes','Chart1','Chart2','Notes'];
-  const rows=trades.map(t=>[t.date,dayOfWeek(t.date),t.instrument,t.direction||'',t.tradeOfDay,t.contractSize,t.riskDollars,t.rMultiple,t.result,pnl(t).toFixed(2),checkScore(t),+!!t.htfPOI,+!!t.liquiditySweep,+!!t.cisd,+!!t.validSession,+!!t.aPlusSetup,+!!t.followedPlan,t.emotion||'',t.duration||'',+!!t.hadMistake,t.mistakeType||'',(t.mistakeNotes||'').replace(/\n/g,' '),(t.tradingViewLink1||''),(t.tradingViewLink2||''),(t.notes||'').replace(/\n/g,' ')]);
+  const h=['Date','Day','Instrument','Direction','Trade#','Contracts','Risk($)','RMultiple','Result','P&L($)','CheckScore','HTF_POI','LiqSweep','CISD','ValidSession','APlus','FollowedPlan','Emotion','Timeframe','EntryTime','Duration','HadMistake','MistakeType','MistakeNotes','Chart1','Chart2','Notes'];
+  const rows=trades.map(t=>[t.date,dayOfWeek(t.date),t.instrument,t.direction||'',t.tradeOfDay,t.contractSize,t.riskDollars,t.rMultiple,t.result,pnl(t).toFixed(2),checkScore(t),+!!t.htfPOI,+!!t.liquiditySweep,+!!t.cisd,+!!t.validSession,+!!t.aPlusSetup,+!!t.followedPlan,t.emotion||'',t.timeframe||'',t.entryTime||'',t.duration||'',+!!t.hadMistake,t.mistakeType||'',(t.mistakeNotes||'').replace(/\n/g,' '),(t.tradingViewLink1||''),(t.tradingViewLink2||''),(t.notes||'').replace(/\n/g,' ')]);
   const csv=[h,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='trade_journal.csv';a.click();
   document.getElementById('export-menu').classList.remove('open');
@@ -664,16 +677,38 @@ function renderInsights(){
     dLoss!==null?`<span class="insight-chip chip-loss-time">✗ Loss avg ${fmtMins(dLoss)}</span>`:'',
     dBe!==null?`<span class="insight-chip chip-be-time">○ B/E avg ${fmtMins(dBe)}</span>`:'',
   ].join('');
+  // Timeframe breakdown
+  const tfStats={};
+  ['1m','3m','5m'].forEach(tf=>{tfStats[tf]={wins:0,losses:0,bes:0};});
+  pt.forEach(t=>{if(t.timeframe&&tfStats[t.timeframe]){if(t.result==='win')tfStats[t.timeframe].wins++;else if(t.result==='loss')tfStats[t.timeframe].losses++;else if(t.result==='be')tfStats[t.timeframe].bes++;}});
+  const hasTF=['1m','3m','5m'].some(tf=>tfStats[tf].wins+tfStats[tf].losses+tfStats[tf].bes>0);
+  const tfHTML=!hasTF?'<span style="color:#2e3448;font-size:10px">Log timeframes to see breakdown</span>':
+    ['1m','3m','5m'].map(tf=>{
+      const s=tfStats[tf],dec=s.wins+s.losses,total=dec+s.bes;
+      if(total===0)return'';
+      const wrNum=dec>0?Math.round(s.wins/dec*100):null;
+      const wrColor=wrNum===null?'#5a6278':wrNum>=60?'#00ff88':wrNum>=40?'#ffd700':'#ff3b5c';
+      const isActive=currentFilter===`tf-${tf}`;
+      const wrStr=wrNum!==null?` · <span style="color:${wrColor};font-weight:700">${wrNum}% WR</span>`:'';
+      return `<span class="insight-chip chip-tf insight-chip-btn${isActive?' tf-active':''}" onclick="setFilter('tf-${tf}')" title="Click to filter by ${tf}">${tf} — ${s.wins}W ${s.losses}L${s.bes>0?` ${s.bes}B`:''}</span>${wrStr}`;
+    }).join('');
   document.getElementById('insight-bar').innerHTML=`
     <div class="insight-card"><div class="insight-label">DIRECTION BREAKDOWN</div><div class="insight-row">${dirHTML}</div></div>
     <div class="insight-card"><div class="insight-label">P&L BY DAY OF WEEK</div><div class="insight-row">${dayHTML}</div></div>
-    <div class="insight-card"><div class="insight-label">AVG TIME IN TRADE</div><div class="insight-row">${durHTML}</div></div>`;
+    <div class="insight-card"><div class="insight-label">AVG TIME IN TRADE</div><div class="insight-row">${durHTML}</div></div>
+    <div class="insight-card"><div class="insight-label">TIMEFRAME BREAKDOWN</div><div class="insight-row">${tfHTML}</div></div>`;
 }
 
 // ── Trade list ────────────────────────────────────────────────────────────────
 function renderTrades(){
   const pt=trades.filter(inPeriod);
-  const filtered=currentFilter==='all'?pt:currentFilter==='long'?pt.filter(t=>t.direction==='long'):currentFilter==='short'?pt.filter(t=>t.direction==='short'):pt.filter(t=>t.result===currentFilter);
+  const filtered=
+    currentFilter==='all' ? pt :
+    currentFilter==='long' ? pt.filter(t=>t.direction==='long') :
+    currentFilter==='short' ? pt.filter(t=>t.direction==='short') :
+    currentFilter.startsWith('tf-') ? pt.filter(t=>t.timeframe===currentFilter.slice(3)) :
+    currentFilter.startsWith('tb-') ? pt.filter(t=>getBucket(t.entryTime)===currentFilter.slice(3)) :
+    pt.filter(t=>t.result===currentFilter);
   const el=document.getElementById('trade-list');
   if(!filtered.length){el.innerHTML=`<div class="empty">${pt.length===0?'No trades recorded for this period.<br>Hit <strong style="color:#6070a0">+ LOG TRADE</strong> to start.':'No trades match the current filter.'}</div>`;return;}
   if(currentView==='table'){
@@ -688,9 +723,10 @@ function renderTrades(){
         :'<span class="tv-link-none">—</span>';
       const durCell=t.duration?`<span style="color:#6070a0;font-size:10px">${t.duration}</span>`:'<span style="color:#2e3448">—</span>';
       const timeCell=t.entryTime?`<span style="color:#8090b0;font-size:10px">${fmtEntryTime(t.entryTime)}</span>`:'<span style="color:#2e3448">—</span>';
-      return `<tr><td style="color:#7080a0">${t.date}</td><td style="color:#5a6680;font-size:10px">${dow}</td><td style="color:#4a5470">#${t.tradeOfDay}</td><td style="color:#fff;font-weight:700">${t.instrument}</td><td>${dirStr}</td><td>${t.contractSize}</td><td style="color:#5a6888">$${t.riskDollars}</td><td style="color:#8090a8">${t.rMultiple}R</td><td>${pnlStr}</td><td><span class="badge badge-${t.result}">${t.result==='be'?'B/E':t.result.toUpperCase()}</span></td><td class="${scoreClass(cs)}">${cs}/6</td><td style="color:#6070a0;font-size:10px">${t.emotion}</td><td>${timeCell}</td><td>${durCell}</td><td>${tvCell}</td><td><button class="action-btn" onclick="openEdit('${t.id}')">Edit</button><button class="action-btn del" onclick="deleteTrade('${t.id}')">Del</button></td></tr>`;
+      const tfCell=t.timeframe?`<span class="chip-tf">${t.timeframe}</span>`:'<span style="color:#2e3448">—</span>';
+      return `<tr><td style="color:#7080a0">${t.date}</td><td style="color:#5a6680;font-size:10px">${dow}</td><td style="color:#4a5470">#${t.tradeOfDay}</td><td style="color:#fff;font-weight:700">${t.instrument}</td><td>${dirStr}</td><td>${t.contractSize}</td><td style="color:#5a6888">$${t.riskDollars}</td><td style="color:#8090a8">${t.rMultiple}R</td><td>${pnlStr}</td><td><span class="badge badge-${t.result}">${t.result==='be'?'B/E':t.result.toUpperCase()}</span></td><td class="${scoreClass(cs)}">${cs}/6</td><td style="color:#6070a0;font-size:10px">${t.emotion}</td><td>${timeCell}</td><td>${tfCell}</td><td>${durCell}</td><td>${tvCell}</td><td><button class="action-btn" onclick="openEdit('${t.id}')">Edit</button><button class="action-btn del" onclick="deleteTrade('${t.id}')">Del</button></td></tr>`;
     }).join('');
-    el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>DATE</th><th>DAY</th><th>#</th><th>INSTR</th><th>DIR</th><th>CONT</th><th>RISK</th><th>R</th><th>P&L</th><th>RESULT</th><th>CHECKS</th><th>EMOTION</th><th>ENTRY</th><th>DURATION</th><th>CHART</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>DATE</th><th>DAY</th><th>#</th><th>INSTR</th><th>DIR</th><th>CONT</th><th>RISK</th><th>R</th><th>P&L</th><th>RESULT</th><th>CHECKS</th><th>EMOTION</th><th>ENTRY</th><th>TF</th><th>DURATION</th><th>CHART</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } else {
     const cards=filtered.map(t=>{
       const p=pnl(t);
@@ -699,10 +735,11 @@ function renderTrades(){
       const dirChip=t.direction==='long'?'<span class="chip-dir-long">▲ LONG</span>':t.direction==='short'?'<span class="chip-dir-short">▼ SHORT</span>':'';
       const durChip=t.duration?`<span class="chip-time">⏱ ${t.duration}</span>`:'';
       const entryChip=t.entryTime?`<span class="chip-entry-time">🕐 ${fmtEntryTime(t.entryTime)}</span>`:'';
+      const tfChip=t.timeframe?`<span class="chip-tf">${t.timeframe}</span>`:'';
       const mistakeChip=t.hadMistake&&t.mistakeType?`<span class="chip-mistake">⚠ ${t.mistakeType}</span>`:'';
       const notes=t.notes?`<div class="card-notes">${t.notes}</div>`:'';
       const chartSection=buildChartSection(t);
-      return `<div class="card card-${t.result}"><div class="card-top"><div><div class="card-instr">${t.instrument}</div><div class="card-meta">${t.date} · ${dayOfWeekFull(t.date)} · Trade #${t.tradeOfDay} · ${t.contractSize} contract${t.contractSize>1?'s':''}</div></div><div style="text-align:right">${pnlDisplay}<div class="card-rmeta">${t.rMultiple}R · $${t.riskDollars} risk</div></div></div><div class="checks">${checks.map(([l,v])=>`<span class="check-chip ${v?'check-on':'check-off'}">${v?'✓':'○'} ${l}</span>`).join('')}</div><div class="card-chips">${dirChip}<span class="chip-emotion">${t.emotion}</span>${entryChip}${durChip}${mistakeChip}</div>${notes}${chartSection}<div class="card-actions"><button class="card-edit" onclick="openEdit('${t.id}')">Edit</button><button class="card-del" onclick="deleteTrade('${t.id}')">Delete</button></div></div>`;
+      return `<div class="card card-${t.result}"><div class="card-top"><div><div class="card-instr">${t.instrument}</div><div class="card-meta">${t.date} · ${dayOfWeekFull(t.date)} · Trade #${t.tradeOfDay} · ${t.contractSize} contract${t.contractSize>1?'s':''}</div></div><div style="text-align:right">${pnlDisplay}<div class="card-rmeta">${t.rMultiple}R · $${t.riskDollars} risk</div></div></div><div class="checks">${checks.map(([l,v])=>`<span class="check-chip ${v?'check-on':'check-off'}">${v?'✓':'○'} ${l}</span>`).join('')}</div><div class="card-chips">${dirChip}<span class="chip-emotion">${t.emotion}</span>${tfChip}${entryChip}${durChip}${mistakeChip}</div>${notes}${chartSection}<div class="card-actions"><button class="card-edit" onclick="openEdit('${t.id}')">Edit</button><button class="card-del" onclick="deleteTrade('${t.id}')">Delete</button></div></div>`;
     }).join('');
     el.innerHTML=`<div class="cards">${cards}</div>`;
   }
@@ -763,11 +800,17 @@ function renderTimeAnalysis() {
     const isEmpty = total === 0;
     const isHot = b === bestBucket && bestBucket !== worstBucket;
     const isCold = b === worstBucket && bestBucket !== worstBucket;
-    const cls = isEmpty ? 'tb-empty' : isHot ? 'tb-hot' : isCold ? 'tb-cold' : 'tb-neutral';
+    const isActive = currentFilter === `tb-${b}`;
+    const cls = [
+      isEmpty ? 'tb-empty' : isHot ? 'tb-hot' : isCold ? 'tb-cold' : 'tb-neutral',
+      isActive ? 'tb-active' : ''
+    ].join(' ');
     const wrColor = wr === null ? '#3a4458' : Number(wr) >= 60 ? '#00ff88' : Number(wr) >= 40 ? '#ffd700' : '#ff3b5c';
     const wrDisplay = isEmpty ? '—' : wr === null ? '—' : `${wr}%`;
     const record = isEmpty ? 'no data' : `${s.wins}W ${s.losses}L${s.bes > 0 ? ` ${s.bes}B` : ''}`;
-    return `<div class="time-bucket ${cls}">
+    const clickHandler = isEmpty ? '' : `onclick="setFilter('tb-${b}')"`;
+    const title = isEmpty ? '' : `title="Click to filter ${fmtBucket(b)} trades"`;
+    return `<div class="time-bucket ${cls}" ${clickHandler} ${title}>
       <div class="tb-window">${fmtBucket(b)}</div>
       <div class="tb-wr" style="color:${wrColor}">${wrDisplay}</div>
       <div class="tb-record">${record}</div>
@@ -779,11 +822,30 @@ function renderTimeAnalysis() {
 }
 function setPeriodMode(m){periodMode=m;periodOffset=0;['month','quarter','all'].forEach(x=>document.getElementById('mode-'+x).classList.toggle('active',x===m));render();}
 function shiftPeriod(d){if(periodMode==='all')return;periodOffset+=d;render();}
-function setFilter(f){currentFilter=f;['all','win','loss','be','long','short'].forEach(x=>document.getElementById('filter-'+x).classList.toggle('active',x===f));renderTrades();}
+function setFilter(f){
+  // Toggle off if already active
+  if(currentFilter===f) f='all';
+  currentFilter=f;
+  // Update regular filter buttons
+  ['all','win','loss','be','long','short'].forEach(x=>{
+    const el=document.getElementById('filter-'+x);
+    if(el) el.classList.toggle('active',x===f);
+  });
+  renderInsights();
+  renderTimeAnalysis();
+  renderTrades();
+}
 function setView(v){currentView=v;['table','card'].forEach(x=>document.getElementById('view-'+x).classList.toggle('active',x===v));renderTrades();}
 function resetChecks(){formChecks={};CHECKS.forEach(k=>{formChecks[k]=false;const b=document.getElementById('chk-'+k);if(b){b.classList.remove('checked');b.querySelector('.check-icon').textContent='○';}});}
 function setResult(r){formResult=r;document.getElementById('btn-win').className='toggle-btn'+(r==='win'?' win-a':'');document.getElementById('btn-loss').className='toggle-btn'+(r==='loss'?' loss-a':'');document.getElementById('btn-be').className='toggle-btn'+(r==='be'?' be-a':'');document.getElementById('be-note').style.display=r==='be'?'block':'none';}
 function setDirection(d){formDirection=d;document.getElementById('btn-long').className='toggle-btn'+(d==='long'?' long-a':'');document.getElementById('btn-short').className='toggle-btn'+(d==='short'?' short-a':'');}
+function setTimeframe(tf){
+  formTimeframe=tf;
+  ['1m','3m','5m'].forEach(t=>{
+    const btn=document.getElementById('btn-tf-'+t);
+    if(btn) btn.className='toggle-btn'+(tf===t?' long-a':'');
+  });
+}
 function toggleCheck(k){formChecks[k]=!formChecks[k];const b=document.getElementById('chk-'+k);b.classList.toggle('checked',formChecks[k]);b.querySelector('.check-icon').textContent=formChecks[k]?'✓':'○';}
 function toggleMistake(){formMistake=!formMistake;const btn=document.getElementById('mistake-toggle-btn');btn.classList.toggle('active',formMistake);btn.innerHTML=`<span>${formMistake?'⚠':'○'}</span>&nbsp;${formMistake?'Mistake Logged':'No Mistake'}`;document.getElementById('mistake-fields').style.display=formMistake?'block':'none';}
 
@@ -791,7 +853,7 @@ function openForm(){
   editingId=null;document.getElementById('modal-title').textContent='Log New Trade';document.getElementById('submit-btn').textContent='LOG TRADE';
   document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
   ['f-instrument','f-tod','f-contracts','f-risk','f-rmult','f-duration','f-entrytime','f-emotion','f-tvlink1','f-tvlink2','f-notes','f-mistake-type','f-mistake-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-instrument'?'MNQ':id==='f-tod'?'1':id==='f-contracts'?'1':id==='f-risk'?'100':id==='f-rmult'?'1':id==='f-emotion'?'Calm':'';});
-  resetChecks();setResult('win');setDirection('long');if(formMistake)toggleMistake();
+  resetChecks();setResult('win');setDirection('long');setTimeframe('');if(formMistake)toggleMistake();
   document.getElementById('modal').style.display='flex';
 }
 function openEdit(id){
@@ -811,7 +873,7 @@ function openEdit(id){
   document.getElementById('f-notes').value=t.notes||'';
   document.getElementById('f-mistake-type').value=t.mistakeType||'';
   document.getElementById('f-mistake-notes').value=t.mistakeNotes||'';
-  resetChecks();setResult(t.result||'win');setDirection(t.direction||'long');CHECKS.forEach(k=>{if(t[k])toggleCheck(k);});
+  resetChecks();setResult(t.result||'win');setDirection(t.direction||'long');setTimeframe(t.timeframe||'');CHECKS.forEach(k=>{if(t[k])toggleCheck(k);});
   const hm=t.hadMistake||false;if(formMistake!==hm)toggleMistake();
   document.getElementById('modal').style.display='flex';
 }
@@ -826,7 +888,7 @@ async function submitTrade(){
     contractSize:Number(document.getElementById('f-contracts').value)||1,
     riskDollars:Number(document.getElementById('f-risk').value)||0,
     rMultiple:Number(document.getElementById('f-rmult').value)||0,
-    result:formResult,direction:formDirection,
+    result:formResult,direction:formDirection,timeframe:formTimeframe,
     duration:document.getElementById('f-duration').value,
     entryTime:document.getElementById('f-entrytime').value,
     emotion:document.getElementById('f-emotion').value,
@@ -848,4 +910,3 @@ loadTrades();
 window.addEventListener('resize',()=>{if(eqPoints.length>=2)drawEquity();});
 </script>
 </body>
-</html>
