@@ -74,6 +74,20 @@
   .chip-win-time { background: rgba(0,255,136,.08); border: 1px solid rgba(0,255,136,.2); color: #00e87a; }
   .chip-loss-time { background: rgba(255,59,92,.08); border: 1px solid rgba(255,59,92,.2); color: #ff3b5c; }
   .chip-be-time { background: rgba(255,215,0,.08); border: 1px solid rgba(255,215,0,.2); color: #ffd700; }
+  .chip-entry-time { font-size: 9px; color: #7080a0; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); padding: 3px 8px; border-radius: 4px; }
+
+  /* Time window breakdown */
+  .time-analysis { background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.07); border-radius: 10px; padding: 14px 18px; margin-bottom: 22px; }
+  .time-analysis-label { font-size: 8px; color: #5a6278; letter-spacing: .18em; margin-bottom: 12px; }
+  .time-buckets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .time-bucket { display: flex; flex-direction: column; align-items: center; gap: 4px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 8px; padding: 8px 10px; min-width: 80px; flex: 1; transition: border-color .15s; }
+  .time-bucket.tb-hot { border-color: rgba(0,255,136,.3); background: rgba(0,255,136,.05); }
+  .time-bucket.tb-cold { border-color: rgba(255,59,92,.25); background: rgba(255,59,92,.04); }
+  .time-bucket.tb-neutral { border-color: rgba(255,255,255,.08); }
+  .time-bucket.tb-empty { opacity: .35; }
+  .tb-window { font-size: 8px; color: #5a6278; letter-spacing: .06em; white-space: nowrap; }
+  .tb-wr { font-size: 13px; font-weight: 700; }
+  .tb-record { font-size: 8px; color: #5a6278; white-space: nowrap; }
   .period-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 10px 16px; flex-wrap: wrap; }
   .period-nav-btn { background: transparent; border: 1px solid rgba(255,255,255,.12); border-radius: 6px; color: #8090b0; padding: 4px 10px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 11px; transition: all .15s; }
   .period-nav-btn:hover { color: #c8cee4; border-color: rgba(255,255,255,.25); }
@@ -265,6 +279,10 @@
   </div>
 
   <div class="insight-bar" id="insight-bar"></div>
+  <div class="time-analysis" id="time-analysis">
+    <div class="time-analysis-label">ENTRY TIME BREAKDOWN (EST) — 15 MIN WINDOWS</div>
+    <div class="time-buckets" id="time-buckets"></div>
+  </div>
 
   <div class="period-bar">
     <button class="period-nav-btn" onclick="shiftPeriod(-1)">◀</button>
@@ -330,6 +348,7 @@
         </div>
       </div>
       <div class="form-group"><label class="form-label">TIME IN TRADE</label><input class="form-input" type="text" id="f-duration" placeholder="e.g. 12m, 1h 30m"></div>
+      <div class="form-group"><label class="form-label">ENTRY TIME (EST)</label><input class="form-input" type="time" id="f-entrytime"></div>
       <div class="form-group"><label class="form-label">EMOTION</label>
         <select class="form-select" id="f-emotion"><option>Calm</option><option>FOMO</option><option>Revenge</option><option>Anxious</option><option>Overconfident</option><option>Hesitant</option><option>Bored</option><option>Disciplined</option></select>
       </div>
@@ -477,6 +496,7 @@ function scoreClass(s){return s>=5?'score-high':s>=3?'score-mid':'score-low';}
 function parseDuration(s){if(!s||!s.trim())return null;let m=0;const h=s.match(/(\d+)\s*h/i),mn=s.match(/(\d+)\s*m/i);if(h)m+=parseInt(h[1])*60;if(mn)m+=parseInt(mn[1]);if(!h&&!mn){const n=parseFloat(s);if(!isNaN(n))m=n;}return m>0?m:null;}
 function fmtMins(m){if(m===null)return'—';if(m<60)return`${Math.round(m)}m`;return`${Math.floor(m/60)}h ${Math.round(m%60)}m`;}
 function calcProfitFactor(ts){const gw=ts.filter(t=>t.result==='win').reduce((s,t)=>s+t.rMultiple*t.riskDollars,0);const gl=ts.filter(t=>t.result==='loss').reduce((s,t)=>s+t.rMultiple*t.riskDollars,0);if(gl===0)return gw>0?Infinity:null;return gw/gl;}
+function fmtEntryTime(t){if(!t)return'';const[h,m]=t.split(':').map(Number);const ampm=h<12?'AM':'PM';const hh=h>12?h-12:h===0?12:h;return`${hh}:${String(m).padStart(2,'0')} ${ampm}`;}
 
 // ── Chart preview builder ─────────────────────────────────────────────────────
 function buildChartSection(t) {
@@ -667,9 +687,10 @@ function renderTrades(){
         ?[link1?`<a href="${link1}" target="_blank" rel="noopener" class="tv-link">📊 1</a>`:'',link2?`<a href="${link2}" target="_blank" rel="noopener" class="tv-link">📊 2</a>`:''].join(' ')
         :'<span class="tv-link-none">—</span>';
       const durCell=t.duration?`<span style="color:#6070a0;font-size:10px">${t.duration}</span>`:'<span style="color:#2e3448">—</span>';
-      return `<tr><td style="color:#7080a0">${t.date}</td><td style="color:#5a6680;font-size:10px">${dow}</td><td style="color:#4a5470">#${t.tradeOfDay}</td><td style="color:#fff;font-weight:700">${t.instrument}</td><td>${dirStr}</td><td>${t.contractSize}</td><td style="color:#5a6888">$${t.riskDollars}</td><td style="color:#8090a8">${t.rMultiple}R</td><td>${pnlStr}</td><td><span class="badge badge-${t.result}">${t.result==='be'?'B/E':t.result.toUpperCase()}</span></td><td class="${scoreClass(cs)}">${cs}/6</td><td style="color:#6070a0;font-size:10px">${t.emotion}</td><td>${durCell}</td><td>${tvCell}</td><td><button class="action-btn" onclick="openEdit('${t.id}')">Edit</button><button class="action-btn del" onclick="deleteTrade('${t.id}')">Del</button></td></tr>`;
+      const timeCell=t.entryTime?`<span style="color:#8090b0;font-size:10px">${fmtEntryTime(t.entryTime)}</span>`:'<span style="color:#2e3448">—</span>';
+      return `<tr><td style="color:#7080a0">${t.date}</td><td style="color:#5a6680;font-size:10px">${dow}</td><td style="color:#4a5470">#${t.tradeOfDay}</td><td style="color:#fff;font-weight:700">${t.instrument}</td><td>${dirStr}</td><td>${t.contractSize}</td><td style="color:#5a6888">$${t.riskDollars}</td><td style="color:#8090a8">${t.rMultiple}R</td><td>${pnlStr}</td><td><span class="badge badge-${t.result}">${t.result==='be'?'B/E':t.result.toUpperCase()}</span></td><td class="${scoreClass(cs)}">${cs}/6</td><td style="color:#6070a0;font-size:10px">${t.emotion}</td><td>${timeCell}</td><td>${durCell}</td><td>${tvCell}</td><td><button class="action-btn" onclick="openEdit('${t.id}')">Edit</button><button class="action-btn del" onclick="deleteTrade('${t.id}')">Del</button></td></tr>`;
     }).join('');
-    el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>DATE</th><th>DAY</th><th>#</th><th>INSTR</th><th>DIR</th><th>CONT</th><th>RISK</th><th>R</th><th>P&L</th><th>RESULT</th><th>CHECKS</th><th>EMOTION</th><th>DURATION</th><th>CHART</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    el.innerHTML=`<div class="table-wrap"><table><thead><tr><th>DATE</th><th>DAY</th><th>#</th><th>INSTR</th><th>DIR</th><th>CONT</th><th>RISK</th><th>R</th><th>P&L</th><th>RESULT</th><th>CHECKS</th><th>EMOTION</th><th>ENTRY</th><th>DURATION</th><th>CHART</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
   } else {
     const cards=filtered.map(t=>{
       const p=pnl(t);
@@ -677,17 +698,85 @@ function renderTrades(){
       const checks=[['HTF POI',t.htfPOI],['Liq Sweep',t.liquiditySweep],['CISD',t.cisd],['Session',t.validSession],['A+ Setup',t.aPlusSetup],['Plan',t.followedPlan]];
       const dirChip=t.direction==='long'?'<span class="chip-dir-long">▲ LONG</span>':t.direction==='short'?'<span class="chip-dir-short">▼ SHORT</span>':'';
       const durChip=t.duration?`<span class="chip-time">⏱ ${t.duration}</span>`:'';
+      const entryChip=t.entryTime?`<span class="chip-entry-time">🕐 ${fmtEntryTime(t.entryTime)}</span>`:'';
       const mistakeChip=t.hadMistake&&t.mistakeType?`<span class="chip-mistake">⚠ ${t.mistakeType}</span>`:'';
       const notes=t.notes?`<div class="card-notes">${t.notes}</div>`:'';
       const chartSection=buildChartSection(t);
-      return `<div class="card card-${t.result}"><div class="card-top"><div><div class="card-instr">${t.instrument}</div><div class="card-meta">${t.date} · ${dayOfWeekFull(t.date)} · Trade #${t.tradeOfDay} · ${t.contractSize} contract${t.contractSize>1?'s':''}</div></div><div style="text-align:right">${pnlDisplay}<div class="card-rmeta">${t.rMultiple}R · $${t.riskDollars} risk</div></div></div><div class="checks">${checks.map(([l,v])=>`<span class="check-chip ${v?'check-on':'check-off'}">${v?'✓':'○'} ${l}</span>`).join('')}</div><div class="card-chips">${dirChip}<span class="chip-emotion">${t.emotion}</span>${durChip}${mistakeChip}</div>${notes}${chartSection}<div class="card-actions"><button class="card-edit" onclick="openEdit('${t.id}')">Edit</button><button class="card-del" onclick="deleteTrade('${t.id}')">Delete</button></div></div>`;
+      return `<div class="card card-${t.result}"><div class="card-top"><div><div class="card-instr">${t.instrument}</div><div class="card-meta">${t.date} · ${dayOfWeekFull(t.date)} · Trade #${t.tradeOfDay} · ${t.contractSize} contract${t.contractSize>1?'s':''}</div></div><div style="text-align:right">${pnlDisplay}<div class="card-rmeta">${t.rMultiple}R · $${t.riskDollars} risk</div></div></div><div class="checks">${checks.map(([l,v])=>`<span class="check-chip ${v?'check-on':'check-off'}">${v?'✓':'○'} ${l}</span>`).join('')}</div><div class="card-chips">${dirChip}<span class="chip-emotion">${t.emotion}</span>${entryChip}${durChip}${mistakeChip}</div>${notes}${chartSection}<div class="card-actions"><button class="card-edit" onclick="openEdit('${t.id}')">Edit</button><button class="card-del" onclick="deleteTrade('${t.id}')">Delete</button></div></div>`;
     }).join('');
     el.innerHTML=`<div class="cards">${cards}</div>`;
   }
 }
 
 function renderPeriodLabel(){document.getElementById('period-label').textContent=currentPeriodBounds().label;}
-function render(){renderPeriodLabel();renderStats();renderEquity();renderInsights();renderTrades();}
+function render(){renderPeriodLabel();renderStats();renderEquity();renderInsights();renderTimeAnalysis();renderTrades();}
+
+// ── Time window breakdown ─────────────────────────────────────────────────────
+const TIME_BUCKETS = [
+  '9:30','9:45','10:00','10:15','10:30','10:45','11:00','11:15'
+];
+function getBucket(timeStr) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  const mins = h * 60 + m;
+  if (mins < 9*60+30 || mins >= 11*60+30) return null;
+  const bucketIndex = Math.floor((mins - (9*60+30)) / 15);
+  return TIME_BUCKETS[bucketIndex] || null;
+}
+function fmtBucket(b) {
+  const [h, m] = b.split(':').map(Number);
+  const endMins = h * 60 + m + 15;
+  const eh = Math.floor(endMins / 60), em = endMins % 60;
+  const fmt = t => { const hh = t > 12 ? t - 12 : t; return `${hh}:${String(em || (t===h?m:0)).padStart(2,'0')}`; };
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const endAmpm = eh < 12 ? 'AM' : 'PM';
+  const sh = h > 12 ? h-12 : h, eh2 = eh > 12 ? eh-12 : eh;
+  return `${sh}:${String(m).padStart(2,'0')}-${eh2}:${String(em).padStart(2,'0')}`;
+}
+function renderTimeAnalysis() {
+  const pt = trades.filter(inPeriod);
+  const stats = {};
+  TIME_BUCKETS.forEach(b => { stats[b] = { wins:0, losses:0, bes:0 }; });
+  pt.forEach(t => {
+    const b = getBucket(t.entryTime);
+    if (!b) return;
+    if (t.result === 'win') stats[b].wins++;
+    else if (t.result === 'loss') stats[b].losses++;
+    else if (t.result === 'be') stats[b].bes++;
+  });
+  const hasAny = TIME_BUCKETS.some(b => stats[b].wins + stats[b].losses + stats[b].bes > 0);
+  // Find best/worst by win rate (min 2 decisive trades)
+  let bestBucket = null, worstBucket = null, bestWR = -1, worstWR = 101;
+  TIME_BUCKETS.forEach(b => {
+    const dec = stats[b].wins + stats[b].losses;
+    if (dec >= 2) {
+      const wr = stats[b].wins / dec * 100;
+      if (wr > bestWR) { bestWR = wr; bestBucket = b; }
+      if (wr < worstWR) { worstWR = wr; worstBucket = b; }
+    }
+  });
+  const bucketsHTML = TIME_BUCKETS.map(b => {
+    const s = stats[b];
+    const dec = s.wins + s.losses;
+    const total = dec + s.bes;
+    const wr = dec > 0 ? (s.wins / dec * 100).toFixed(0) : null;
+    const isEmpty = total === 0;
+    const isHot = b === bestBucket && bestBucket !== worstBucket;
+    const isCold = b === worstBucket && bestBucket !== worstBucket;
+    const cls = isEmpty ? 'tb-empty' : isHot ? 'tb-hot' : isCold ? 'tb-cold' : 'tb-neutral';
+    const wrColor = wr === null ? '#3a4458' : Number(wr) >= 60 ? '#00ff88' : Number(wr) >= 40 ? '#ffd700' : '#ff3b5c';
+    const wrDisplay = isEmpty ? '—' : wr === null ? '—' : `${wr}%`;
+    const record = isEmpty ? 'no data' : `${s.wins}W ${s.losses}L${s.bes > 0 ? ` ${s.bes}B` : ''}`;
+    return `<div class="time-bucket ${cls}">
+      <div class="tb-window">${fmtBucket(b)}</div>
+      <div class="tb-wr" style="color:${wrColor}">${wrDisplay}</div>
+      <div class="tb-record">${record}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('time-buckets').innerHTML = hasAny
+    ? bucketsHTML
+    : `<span style="color:#2e3448;font-size:10px">Log entry times to see breakdown</span>`;
+}
 function setPeriodMode(m){periodMode=m;periodOffset=0;['month','quarter','all'].forEach(x=>document.getElementById('mode-'+x).classList.toggle('active',x===m));render();}
 function shiftPeriod(d){if(periodMode==='all')return;periodOffset+=d;render();}
 function setFilter(f){currentFilter=f;['all','win','loss','be','long','short'].forEach(x=>document.getElementById('filter-'+x).classList.toggle('active',x===f));renderTrades();}
@@ -701,7 +790,7 @@ function toggleMistake(){formMistake=!formMistake;const btn=document.getElementB
 function openForm(){
   editingId=null;document.getElementById('modal-title').textContent='Log New Trade';document.getElementById('submit-btn').textContent='LOG TRADE';
   document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
-  ['f-instrument','f-tod','f-contracts','f-risk','f-rmult','f-duration','f-emotion','f-tvlink1','f-tvlink2','f-notes','f-mistake-type','f-mistake-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-instrument'?'MNQ':id==='f-tod'?'1':id==='f-contracts'?'1':id==='f-risk'?'100':id==='f-rmult'?'1':id==='f-emotion'?'Calm':'';});
+  ['f-instrument','f-tod','f-contracts','f-risk','f-rmult','f-duration','f-entrytime','f-emotion','f-tvlink1','f-tvlink2','f-notes','f-mistake-type','f-mistake-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-instrument'?'MNQ':id==='f-tod'?'1':id==='f-contracts'?'1':id==='f-risk'?'100':id==='f-rmult'?'1':id==='f-emotion'?'Calm':'';});
   resetChecks();setResult('win');setDirection('long');if(formMistake)toggleMistake();
   document.getElementById('modal').style.display='flex';
 }
@@ -715,6 +804,7 @@ function openEdit(id){
   document.getElementById('f-risk').value=t.riskDollars;
   document.getElementById('f-rmult').value=t.rMultiple;
   document.getElementById('f-duration').value=t.duration||'';
+  document.getElementById('f-entrytime').value=t.entryTime||'';
   document.getElementById('f-emotion').value=t.emotion;
   document.getElementById('f-tvlink1').value=t.tradingViewLink1||t.tradingViewLink||'';
   document.getElementById('f-tvlink2').value=t.tradingViewLink2||'';
@@ -738,6 +828,7 @@ async function submitTrade(){
     rMultiple:Number(document.getElementById('f-rmult').value)||0,
     result:formResult,direction:formDirection,
     duration:document.getElementById('f-duration').value,
+    entryTime:document.getElementById('f-entrytime').value,
     emotion:document.getElementById('f-emotion').value,
     hadMistake:formMistake,
     mistakeType:document.getElementById('f-mistake-type').value,
