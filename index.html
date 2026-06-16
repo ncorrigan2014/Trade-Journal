@@ -633,12 +633,12 @@ function renderStats(){
   const pfCardCls=pf===null?'':pf>=2?'pf-elite':pf>=1.5?'pf-solid':pf<1?'pf-poor':'';
   const pfNote=pf===null?'':`<div class="pf-note" style="color:${pf>=2?'#00e87a':pf>=1.5?'#ffd700':pf>=1?'#5a6278':'#ff3b5c'}">${pf>=2?'Elite ≥ 2.0':pf>=1.5?'Solid ≥ 1.5':pf>=1?'Developing':'Below breakeven'}</div>`;
   // B/E sub breakdown
-  const beSub=bes>0?()=>{
+  let beSub='';
+  if(bes>0){
     const hit2r=pt.filter(t=>t.result==='be'&&t.beOutcome==='hit2r').length;
     const stopped=pt.filter(t=>t.result==='be'&&t.beOutcome==='stopped').length;
-    if(hit2r===0&&stopped===0)return'';
-    return`<div class="stat-sub"><span style="color:#00e87a">→2R: ${hit2r}</span><span style="color:#ff3b5c">→SL: ${stopped}</span></div>`;
-  }():'';
+    if(hit2r>0||stopped>0) beSub=`<div class="stat-sub"><span style="color:#00e87a">→2R: ${hit2r}</span><span style="color:#ff3b5c">→SL: ${stopped}</span></div>`;
+  }
   document.getElementById('stats-row').innerHTML=[
     {label:'TOTAL P&L',val:has?fmtPnl(totalPnl):'$0',cls:has?pnlClass(totalPnl):'white'},
     {label:'WIN RATE',val:has?wr+'%':'—',cls:'white',note:'W vs L only'},
