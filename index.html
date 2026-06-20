@@ -70,9 +70,13 @@
 
   /* BE analysis card */
   .be-analysis { background: rgba(255,215,0,.03); border: 1px solid rgba(255,215,0,.12); border-radius: 12px; padding: 16px 20px; margin-bottom: 22px; }
-  .be-analysis-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+  .be-analysis-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
   .be-analysis-title { font-size: 9px; color: #5a6278; letter-spacing: .2em; }
   .be-analysis-summary { font-size: 11px; color: #7080a0; }
+  .be-trigger-section { margin-bottom: 16px; }
+  .be-trigger-section:last-child { margin-bottom: 0; }
+  .be-trigger-label { font-size: 9px; color: #ffd700; letter-spacing: .15em; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .be-trigger-tag { font-size: 8px; color: #5a6278; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); padding: 2px 7px; border-radius: 4px; letter-spacing: .05em; font-weight: 400; }
   .be-outcomes { display: flex; gap: 12px; flex-wrap: wrap; }
   .be-outcome-card { flex: 1; min-width: 140px; background: rgba(255,255,255,.03); border-radius: 8px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.07); }
   .be-outcome-label { font-size: 8px; color: #5a6278; letter-spacing: .15em; margin-bottom: 6px; }
@@ -85,6 +89,7 @@
   .be-net-label { font-size: 8px; color: #5a6278; letter-spacing: .15em; margin-bottom: 6px; }
   .be-net-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
   .be-net-chip { font-size: 10px; padding: 3px 8px; border-radius: 4px; }
+  .be-empty-state { font-size: 11px; color: #3a4458; padding: 16px; text-align: center; background: rgba(255,255,255,.02); border-radius: 8px; border: 1px dashed rgba(255,255,255,.08); }
 
   /* Insights */
   .insight-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 22px; }
@@ -304,7 +309,7 @@
       <div class="be-analysis-title">BREAKEVEN OUTCOME ANALYSIS</div>
       <div class="be-analysis-summary" id="be-analysis-summary"></div>
     </div>
-    <div class="be-outcomes" id="be-outcomes"></div>
+    <div id="be-outcomes-wrap"></div>
   </div>
 
   <div class="equity-wrap">
@@ -411,6 +416,11 @@
 
     <!-- B/E Outcome — only shows when B/E is selected -->
     <div id="be-outcome-section" class="be-outcome-section" style="display:none">
+      <label class="form-label">B/E TRIGGER LEVEL</label>
+      <div class="toggle-group" style="margin-top:8px;margin-bottom:14px">
+        <button class="toggle-btn" id="btn-trigger-1r" onclick="setBeTrigger('1R')">1R (old rule)</button>
+        <button class="toggle-btn" id="btn-trigger-15r" onclick="setBeTrigger('1.5R')">1.5R (testing)</button>
+      </div>
       <label class="form-label">IF YOU HADN'T MOVED TO B/E — WHAT WOULD HAVE HAPPENED?</label>
       <div class="toggle-group" style="margin-top:8px">
         <button class="toggle-btn" id="btn-hit2r" onclick="setBeOutcome('hit2r')">✓ Would Hit 2R</button>
@@ -469,7 +479,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 const DB_ID='main';
 let trades=[], currentView='table', currentFilter='all';
-let editingId=null, formChecks={}, formResult='win', formDirection='long', formMistake=false, formTimeframe='', formBeOutcome='';
+let editingId=null, formChecks={}, formResult='win', formDirection='long', formMistake=false, formTimeframe='', formBeOutcome='', formBeTrigger='1.5R';
 let periodMode='month', periodOffset=0, eqFilter='all';
 const CHECKS=['htfPOI','liquiditySweep','cisd','validSession','aPlusSetup','followedPlan'];
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -510,8 +520,8 @@ function toggleExportMenu(){document.getElementById('export-menu').classList.tog
 document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))document.getElementById('export-menu').classList.remove('open');});
 function exportJSON(){const b=new Blob([JSON.stringify(trades,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='trade_journal_backup.json';a.click();document.getElementById('export-menu').classList.remove('open');}
 function exportCSV(){
-  const h=['Date','Day','Instrument','Direction','Trade#','Contracts','Risk($)','RMultiple','Result','P&L($)','BEOutcome','CheckScore','HTF_POI','LiqSweep','CISD','ValidSession','APlus','FollowedPlan','Emotion','Timeframe','EntryTime','Duration','HadMistake','MistakeType','MistakeNotes','Chart1','Chart2','Notes'];
-  const rows=trades.map(t=>[t.date,dayOfWeek(t.date),t.instrument,t.direction||'',t.tradeOfDay,t.contractSize,t.riskDollars,t.rMultiple,t.result,pnl(t).toFixed(2),t.beOutcome||'',checkScore(t),+!!t.htfPOI,+!!t.liquiditySweep,+!!t.cisd,+!!t.validSession,+!!t.aPlusSetup,+!!t.followedPlan,t.emotion||'',t.timeframe||'',t.entryTime||'',t.duration||'',+!!t.hadMistake,t.mistakeType||'',(t.mistakeNotes||'').replace(/\n/g,' '),(t.tradingViewLink1||''),(t.tradingViewLink2||''),(t.notes||'').replace(/\n/g,' ')]);
+  const h=['Date','Day','Instrument','Direction','Trade#','Contracts','Risk($)','RMultiple','Result','P&L($)','BETrigger','BEOutcome','CheckScore','HTF_POI','LiqSweep','CISD','ValidSession','APlus','FollowedPlan','Emotion','Timeframe','EntryTime','Duration','HadMistake','MistakeType','MistakeNotes','Chart1','Chart2','Notes'];
+  const rows=trades.map(t=>[t.date,dayOfWeek(t.date),t.instrument,t.direction||'',t.tradeOfDay,t.contractSize,t.riskDollars,t.rMultiple,t.result,pnl(t).toFixed(2),t.result==='be'?(t.beTrigger||'1R'):'',t.beOutcome||'',checkScore(t),+!!t.htfPOI,+!!t.liquiditySweep,+!!t.cisd,+!!t.validSession,+!!t.aPlusSetup,+!!t.followedPlan,t.emotion||'',t.timeframe||'',t.entryTime||'',t.duration||'',+!!t.hadMistake,t.mistakeType||'',(t.mistakeNotes||'').replace(/\n/g,' '),(t.tradingViewLink1||''),(t.tradingViewLink2||''),(t.notes||'').replace(/\n/g,' ')]);
   const csv=[h,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
   const b=new Blob([csv],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='trade_journal.csv';a.click();
   document.getElementById('export-menu').classList.remove('open');
@@ -576,47 +586,53 @@ function switchChart(tid,num){
 }
 
 // ── B/E Analysis ──────────────────────────────────────────────────────────────
-function renderBeAnalysis(){
-  const pt=trades.filter(inPeriod);
-  const bes=pt.filter(t=>t.result==='be');
-  const el=document.getElementById('be-analysis');
-  if(bes.length===0){el.style.display='none';return;}
-  el.style.display='block';
+function buildBeOutcomeBlock(bes, riskDollar){
   const hit2r=bes.filter(t=>t.beOutcome==='hit2r').length;
   const stopped=bes.filter(t=>t.beOutcome==='stopped').length;
   const unknown=bes.length-hit2r-stopped;
-  // Net impact calculation
-  const savedR=stopped; // each stopped B/E saved 1R
-  const missedR=hit2r*2; // each hit2r missed 2R
-  const netR=missedR-savedR; // how much you "cost" yourself vs how much you saved
-  const riskDollar=pt.length>0?(pt.reduce((s,t)=>s+t.riskDollars,0)/pt.length):100;
-  const netDollar=(missedR-savedR)*riskDollar;
-  document.getElementById('be-analysis-summary').textContent=`${bes.length} B/E trade${bes.length!==1?'s':''} · ${unknown} pending analysis`;
-  const savedChip=`<span class="be-net-chip" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);color:#00e87a">✓ Saved ${stopped}R (~${fmtPnl(stopped*riskDollar)}) from losses</span>`;
+  const savedR=stopped;
+  const missedR=hit2r*2;
+  const netR=missedR-savedR;
+  const savedChip=stopped>0?`<span class="be-net-chip" style="background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.2);color:#00e87a">✓ Saved ${stopped}R (~${fmtPnl(stopped*riskDollar)}) from losses</span>`:'';
   const missedChip=hit2r>0?`<span class="be-net-chip" style="background:rgba(255,59,92,.1);border:1px solid rgba(255,59,92,.2);color:#ff3b5c">✗ Missed ${missedR}R (~${fmtPnl(missedR*riskDollar)}) in wins</span>`:'';
   const netColor=netR<=0?'#00e87a':'#ff3b5c';
-  const netText=netR<=0?`B/E rule is net POSITIVE — saved ${Math.abs(netR)}R more than it cost`:`B/E rule cost ${netR}R net — missed more wins than losses saved`;
+  const netText=netR===0?'Net neutral so far':netR<0?`Net POSITIVE — saved ${Math.abs(netR)}R more than it cost`:`Cost ${netR}R net — missed more wins than losses saved`;
   const netChip=(hit2r>0||stopped>0)?`<span class="be-net-chip" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:${netColor}">${netText}</span>`:'';
-  document.getElementById('be-outcomes').innerHTML=`
-    <div class="be-outcome-card hit2r">
-      <div class="be-outcome-label">WOULD HIT 2R</div>
-      <div class="be-outcome-val green">${hit2r}</div>
-      <div class="be-outcome-sub">${hit2r>0?`~${fmtPnl(hit2r*2*riskDollar)} missed`:'none logged'}</div>
-    </div>
-    <div class="be-outcome-card stopped">
-      <div class="be-outcome-label">WOULD STOP OUT</div>
-      <div class="be-outcome-val red">${stopped}</div>
-      <div class="be-outcome-sub">${stopped>0?`~${fmtPnl(stopped*riskDollar)} saved`:'none logged'}</div>
-    </div>
-    <div class="be-outcome-card unknown">
-      <div class="be-outcome-label">NOT YET LOGGED</div>
-      <div class="be-outcome-val white">${unknown}</div>
-      <div class="be-outcome-sub">edit to add outcome</div>
-    </div>
-    <div class="be-net">
-      <div class="be-net-label">NET IMPACT OF B/E RULE</div>
-      <div class="be-net-row">${savedChip}${missedChip}${netChip}</div>
+  return `<div class="be-outcomes">
+    <div class="be-outcome-card hit2r"><div class="be-outcome-label">WOULD HIT 2R</div><div class="be-outcome-val green">${hit2r}</div><div class="be-outcome-sub">${hit2r>0?`~${fmtPnl(hit2r*2*riskDollar)} missed`:'none logged'}</div></div>
+    <div class="be-outcome-card stopped"><div class="be-outcome-label">WOULD STOP OUT</div><div class="be-outcome-val red">${stopped}</div><div class="be-outcome-sub">${stopped>0?`~${fmtPnl(stopped*riskDollar)} saved`:'none logged'}</div></div>
+    <div class="be-outcome-card unknown"><div class="be-outcome-label">NOT YET LOGGED</div><div class="be-outcome-val white">${unknown}</div><div class="be-outcome-sub">edit to add outcome</div></div>
+    <div class="be-net"><div class="be-net-label">NET IMPACT</div><div class="be-net-row">${savedChip}${missedChip}${netChip}</div></div>
+  </div>`;
+}
+
+function renderBeAnalysis(){
+  const pt=trades.filter(inPeriod);
+  const allBes=pt.filter(t=>t.result==='be');
+  const el=document.getElementById('be-analysis');
+  if(allBes.length===0){el.style.display='none';return;}
+  el.style.display='block';
+
+  // Historical = no beTrigger field OR explicitly '1R'. Live test = '1.5R'.
+  const bes1R=allBes.filter(t=>!t.beTrigger||t.beTrigger==='1R');
+  const bes15R=allBes.filter(t=>t.beTrigger==='1.5R');
+  const riskDollar=pt.length>0?(pt.reduce((s,t)=>s+t.riskDollars,0)/pt.length):100;
+
+  document.getElementById('be-analysis-summary').textContent=`${allBes.length} total B/E trade${allBes.length!==1?'s':''}`;
+
+  const section1R=`
+    <div class="be-trigger-section">
+      <div class="be-trigger-label">1R TRIGGER <span class="be-trigger-tag">HISTORICAL · OLD RULE · ${bes1R.length} TRADES</span></div>
+      ${bes1R.length>0?buildBeOutcomeBlock(bes1R,riskDollar):'<div class="be-empty-state">No 1R-trigger B/E trades in this period</div>'}
     </div>`;
+
+  const section15R=`
+    <div class="be-trigger-section">
+      <div class="be-trigger-label">1.5R TRIGGER <span class="be-trigger-tag">LIVE TEST · ${bes15R.length} TRADES</span></div>
+      ${bes15R.length>0?buildBeOutcomeBlock(bes15R,riskDollar):'<div class="be-empty-state">No 1.5R-trigger trades logged yet — this fills in as you test the new rule going forward</div>'}
+    </div>`;
+
+  document.getElementById('be-outcomes-wrap').innerHTML = section1R + section15R;
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
@@ -632,12 +648,18 @@ function renderStats(){
   const pfCls=pf===null?'white':pf>=2?'green':pf>=1.5?'gold':pf>=1?'white':'red';
   const pfCardCls=pf===null?'':pf>=2?'pf-elite':pf>=1.5?'pf-solid':pf<1?'pf-poor':'';
   const pfNote=pf===null?'':`<div class="pf-note" style="color:${pf>=2?'#00e87a':pf>=1.5?'#ffd700':pf>=1?'#5a6278':'#ff3b5c'}">${pf>=2?'Elite ≥ 2.0':pf>=1.5?'Solid ≥ 1.5':pf>=1?'Developing':'Below breakeven'}</div>`;
-  // B/E sub breakdown
+  // B/E sub breakdown — split by trigger
   let beSub='';
   if(bes>0){
-    const hit2r=pt.filter(t=>t.result==='be'&&t.beOutcome==='hit2r').length;
-    const stopped=pt.filter(t=>t.result==='be'&&t.beOutcome==='stopped').length;
-    if(hit2r>0||stopped>0) beSub=`<div class="stat-sub"><span style="color:#00e87a">→2R: ${hit2r}</span><span style="color:#ff3b5c">→SL: ${stopped}</span></div>`;
+    const beTrades=pt.filter(t=>t.result==='be');
+    const bes1R=beTrades.filter(t=>!t.beTrigger||t.beTrigger==='1R');
+    const bes15R=beTrades.filter(t=>t.beTrigger==='1.5R');
+    const h1=bes1R.filter(t=>t.beOutcome==='hit2r').length, s1=bes1R.filter(t=>t.beOutcome==='stopped').length;
+    const h15=bes15R.filter(t=>t.beOutcome==='hit2r').length, s15=bes15R.filter(t=>t.beOutcome==='stopped').length;
+    const parts=[];
+    if(h1>0||s1>0) parts.push(`<span style="color:#7080a0">1R:</span> <span style="color:#00e87a">${h1}→2R</span> <span style="color:#ff3b5c">${s1}→SL</span>`);
+    if(h15>0||s15>0) parts.push(`<span style="color:#7080a0">1.5R:</span> <span style="color:#00e87a">${h15}→2R</span> <span style="color:#ff3b5c">${s15}→SL</span>`);
+    if(parts.length) beSub=`<div class="stat-sub">${parts.join('<br>')}</div>`;
   }
   document.getElementById('stats-row').innerHTML=[
     {label:'TOTAL P&L',val:has?fmtPnl(totalPnl):'$0',cls:has?pnlClass(totalPnl):'white'},
@@ -791,9 +813,11 @@ function renderTrades(){
 
   const beOutcomeChip=t=>{
     if(t.result!=='be')return'';
-    if(t.beOutcome==='hit2r')return'<span class="chip-be-hit2r">→ 2R</span>';
-    if(t.beOutcome==='stopped')return'<span class="chip-be-stopped">→ SL</span>';
-    return'<span style="font-size:9px;color:#3a4458;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);padding:3px 8px;border-radius:4px">→ ?</span>';
+    const trig=t.beTrigger||'1R';
+    const trigTag=`<span style="font-size:8px;color:#5a6278;margin-right:3px">${trig}</span>`;
+    if(t.beOutcome==='hit2r')return trigTag+'<span class="chip-be-hit2r">→ 2R</span>';
+    if(t.beOutcome==='stopped')return trigTag+'<span class="chip-be-stopped">→ SL</span>';
+    return trigTag+'<span style="font-size:9px;color:#3a4458;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);padding:3px 8px;border-radius:4px">→ ?</span>';
   };
 
   if(currentView==='table'){
@@ -855,6 +879,11 @@ function setTimeframe(tf){
   formTimeframe=tf;
   ['1m','3m','5m'].forEach(t=>{const btn=document.getElementById('btn-tf-'+t);if(btn)btn.className='toggle-btn'+(tf===t?' tf-a':'');});
 }
+function setBeTrigger(trig){
+  formBeTrigger=trig;
+  document.getElementById('btn-trigger-1r').className='toggle-btn'+(trig==='1R'?' be-a':'');
+  document.getElementById('btn-trigger-15r').className='toggle-btn'+(trig==='1.5R'?' hit2r-a':'');
+}
 function setBeOutcome(o){
   formBeOutcome=o;
   document.getElementById('btn-hit2r').className='toggle-btn'+(o==='hit2r'?' hit2r-a':'');
@@ -867,7 +896,7 @@ function openForm(){
   editingId=null;document.getElementById('modal-title').textContent='Log New Trade';document.getElementById('submit-btn').textContent='LOG TRADE';
   document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
   ['f-instrument','f-tod','f-contracts','f-risk','f-rmult','f-duration','f-entrytime','f-emotion','f-tvlink1','f-tvlink2','f-notes','f-mistake-type','f-mistake-notes'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=id==='f-instrument'?'MNQ':id==='f-tod'?'1':id==='f-contracts'?'1':id==='f-risk'?'100':id==='f-rmult'?'1':id==='f-emotion'?'Calm':'';});
-  resetChecks();setResult('win');setDirection('long');setTimeframe('');formBeOutcome='';
+  resetChecks();setResult('win');setDirection('long');setTimeframe('');formBeOutcome='';setBeTrigger('1.5R');
   if(formMistake)toggleMistake();
   document.getElementById('modal').style.display='flex';
 }
@@ -876,6 +905,7 @@ function openEdit(id){
   document.getElementById('modal-title').textContent='Edit Trade';document.getElementById('submit-btn').textContent='SAVE CHANGES';
   document.getElementById('f-date').value=t.date;document.getElementById('f-instrument').value=t.instrument;document.getElementById('f-tod').value=String(t.tradeOfDay);document.getElementById('f-contracts').value=t.contractSize;document.getElementById('f-risk').value=t.riskDollars;document.getElementById('f-rmult').value=t.rMultiple;document.getElementById('f-duration').value=t.duration||'';document.getElementById('f-entrytime').value=t.entryTime||'';document.getElementById('f-emotion').value=t.emotion;document.getElementById('f-tvlink1').value=t.tradingViewLink1||'';document.getElementById('f-tvlink2').value=t.tradingViewLink2||'';document.getElementById('f-notes').value=t.notes||'';document.getElementById('f-mistake-type').value=t.mistakeType||'';document.getElementById('f-mistake-notes').value=t.mistakeNotes||'';
   resetChecks();setResult(t.result||'win');setDirection(t.direction||'long');setTimeframe(t.timeframe||'');
+  setBeTrigger(t.beTrigger||'1R');
   if(t.beOutcome)setBeOutcome(t.beOutcome);else{formBeOutcome='';document.getElementById('btn-hit2r').className='toggle-btn';document.getElementById('btn-stopped').className='toggle-btn';}
   CHECKS.forEach(k=>{if(t[k])toggleCheck(k);});
   const hm=t.hadMistake||false;if(formMistake!==hm)toggleMistake();
@@ -894,6 +924,7 @@ async function submitTrade(){
     rMultiple:Number(document.getElementById('f-rmult').value)||0,
     result:formResult,direction:formDirection,timeframe:formTimeframe,
     beOutcome:formResult==='be'?formBeOutcome:'',
+    beTrigger:formResult==='be'?formBeTrigger:'',
     entryTime:document.getElementById('f-entrytime').value,
     duration:document.getElementById('f-duration').value,
     emotion:document.getElementById('f-emotion').value,
