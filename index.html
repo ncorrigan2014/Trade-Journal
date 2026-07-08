@@ -70,6 +70,16 @@
 
   /* BE analysis card */
   .be-analysis { background: rgba(255,215,0,.03); border: 1px solid rgba(255,215,0,.12); border-radius: 12px; padding: 16px 20px; margin-bottom: 22px; }
+  /* Needs attention bar */
+  .attention-bar { background: rgba(255,159,67,.05); border: 1px solid rgba(255,159,67,.22); border-radius: 12px; padding: 13px 18px; margin-bottom: 22px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .attention-icon { font-size: 13px; color: #ff9f43; }
+  .attention-label { font-size: 9px; color: #ff9f43; letter-spacing: .18em; font-weight: 700; }
+  .attention-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .attention-chip { font-size: 10px; padding: 4px 10px; border-radius: 5px; background: rgba(255,159,67,.1); border: 1px solid rgba(255,159,67,.28); color: #ff9f43; cursor: pointer; transition: all .15s; white-space: nowrap; }
+  .attention-chip:hover { background: rgba(255,159,67,.2); transform: translateY(-1px); }
+  .attention-chip.att-active { box-shadow: 0 0 0 2px rgba(255,159,67,.45); background: rgba(255,159,67,.22); }
+  .attention-clear { font-size: 10px; color: #6070a0; background: transparent; border: 1px solid rgba(255,255,255,.12); border-radius: 5px; padding: 4px 10px; cursor: pointer; font-family: 'Space Mono', monospace; margin-left: auto; }
+  .attention-clear:hover { color: #c8cee4; border-color: rgba(255,255,255,.28); }
   .be-analysis-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
   .be-analysis-title { font-size: 9px; color: #5a6278; letter-spacing: .2em; }
   .be-analysis-summary { font-size: 11px; color: #7080a0; }
@@ -305,6 +315,14 @@
   <div class="stats" id="stats-row"></div>
 
   <!-- B/E Outcome Analysis -->
+  <!-- Needs Attention -->
+  <div class="attention-bar" id="attention-bar" style="display:none">
+    <span class="attention-icon">⚠</span>
+    <span class="attention-label">NEEDS ATTENTION</span>
+    <div class="attention-chips" id="attention-chips"></div>
+    <button class="attention-clear" id="attention-clear" style="display:none" onclick="setFilter('all')">✕ clear filter</button>
+  </div>
+
   <div class="be-analysis" id="be-analysis" style="display:none">
     <div class="be-analysis-header">
       <div class="be-analysis-title">BREAKEVEN OUTCOME ANALYSIS</div>
@@ -853,6 +871,9 @@ function renderTrades(){
     currentFilter==='short'?pt.filter(t=>t.direction==='short'):
     currentFilter.startsWith('tf-')?pt.filter(t=>t.timeframe===currentFilter.slice(3)):
     currentFilter.startsWith('tb-')?pt.filter(t=>getBucket(t.entryTime)===currentFilter.slice(3)):
+    currentFilter==='miss-entry'?pt.filter(t=>!t.entryTime):
+    currentFilter==='miss-tf'?pt.filter(t=>!t.timeframe):
+    currentFilter==='miss-beout'?pt.filter(t=>t.result==='be'&&!t.beOutcome):
     pt.filter(t=>t.result===currentFilter);
   const el=document.getElementById('trade-list');
   if(!filtered.length){el.innerHTML=`<div class="empty">${pt.length===0?'No trades recorded for this period.<br>Hit <strong style="color:#6070a0">+ LOG TRADE</strong> to start.':'No trades match the current filter.'}</div>`;return;}
@@ -899,11 +920,35 @@ function renderTrades(){
 }
 
 // ── Controls ──────────────────────────────────────────────────────────────────
+// ── Needs Attention ───────────────────────────────────────────────────────────
+function renderAttention(){
+  const pt=trades.filter(inPeriod);
+  const bar=document.getElementById('attention-bar');
+  const missEntry=pt.filter(t=>!t.entryTime).length;
+  const missTf=pt.filter(t=>!t.timeframe).length;
+  const missBeOut=pt.filter(t=>t.result==='be'&&!t.beOutcome).length;
+  const total=missEntry+missTf+missBeOut;
+  if(total===0){bar.style.display='none';return;}
+  bar.style.display='flex';
+  const chip=(key,count,label)=>{
+    if(count===0)return'';
+    const active=currentFilter===key?' att-active':'';
+    return `<span class="attention-chip${active}" onclick="setFilter('${key}')" title="Click to show only these trades">${count} ${label}${count!==1?'s':''}</span>`;
+  };
+  document.getElementById('attention-chips').innerHTML=[
+    chip('miss-entry',missEntry,'missing entry time'),
+    chip('miss-tf',missTf,'missing timeframe'),
+    chip('miss-beout',missBeOut,'B/E missing outcome'),
+  ].join('');
+  const isFiltered=['miss-entry','miss-tf','miss-beout'].includes(currentFilter);
+  document.getElementById('attention-clear').style.display=isFiltered?'block':'none';
+}
+
 function setFilter(f){
   if(currentFilter===f)f='all';
   currentFilter=f;
   ['all','win','loss','be','long','short'].forEach(x=>{const el=document.getElementById('filter-'+x);if(el)el.classList.toggle('active',x===f);});
-  renderInsights();renderTimeAnalysis();renderTrades();
+  renderAttention();renderInsights();renderTimeAnalysis();renderTrades();
 }
 function setView(v){currentView=v;['table','card'].forEach(x=>document.getElementById('view-'+x).classList.toggle('active',x===v));renderTrades();}
 function setPeriodMode(m){periodMode=m;periodOffset=0;['month','quarter','all'].forEach(x=>document.getElementById('mode-'+x).classList.toggle('active',x===m));render();}
@@ -989,7 +1034,7 @@ async function submitTrade(){
 async function deleteTrade(id){if(!confirm('Delete this trade?'))return;trades=trades.filter(t=>t.id!==id);await saveTrades();render();}
 
 function renderPeriodLabel(){document.getElementById('period-label').textContent=currentPeriodBounds().label;}
-function render(){renderPeriodLabel();renderStats();renderBeAnalysis();renderEquity();renderInsights();renderTimeAnalysis();renderTrades();}
+function render(){renderPeriodLabel();renderStats();renderAttention();renderBeAnalysis();renderEquity();renderInsights();renderTimeAnalysis();renderTrades();}
 
 loadTrades();
 window.addEventListener('resize',()=>{if(eqPoints.length>=2)drawEquity();});
