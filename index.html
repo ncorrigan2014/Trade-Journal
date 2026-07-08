@@ -402,7 +402,6 @@
       </div>
       <div class="form-group"><label class="form-label">TIMEFRAME</label>
         <div class="toggle-group">
-          <button class="toggle-btn" id="btn-tf-1m" onclick="setTimeframe('1m')">1m</button>
           <button class="toggle-btn" id="btn-tf-3m" onclick="setTimeframe('3m')">3m</button>
           <button class="toggle-btn" id="btn-tf-5m" onclick="setTimeframe('5m')">5m</button>
         </div>
@@ -802,11 +801,11 @@ function renderInsights(){
     dLoss!==null?`<span class="insight-chip chip-loss-time">✗ Loss avg ${fmtMins(dLoss)}</span>`:'',
     dBe!==null?`<span class="insight-chip chip-be-time">○ B/E avg ${fmtMins(dBe)}</span>`:'',
   ].join('');
-  const tfStats={'1m':{wins:0,losses:0,bes:0},'3m':{wins:0,losses:0,bes:0},'5m':{wins:0,losses:0,bes:0}};
+  const tfStats={'3m':{wins:0,losses:0,bes:0},'5m':{wins:0,losses:0,bes:0}};
   pt.forEach(t=>{if(t.timeframe&&tfStats[t.timeframe]){if(t.result==='win')tfStats[t.timeframe].wins++;else if(t.result==='loss')tfStats[t.timeframe].losses++;else if(t.result==='be')tfStats[t.timeframe].bes++;}});
-  const hasTF=['1m','3m','5m'].some(tf=>tfStats[tf].wins+tfStats[tf].losses+tfStats[tf].bes>0);
+  const hasTF=['3m','5m'].some(tf=>tfStats[tf].wins+tfStats[tf].losses+tfStats[tf].bes>0);
   const tfHTML=!hasTF?'<span style="color:#2e3448;font-size:10px">Log timeframes to see breakdown</span>':
-    ['1m','3m','5m'].map(tf=>{
+    ['3m','5m'].map(tf=>{
       const s=tfStats[tf],dec=s.wins+s.losses,total=dec+s.bes;
       if(total===0)return'';
       const wrNum=dec>0?Math.round(s.wins/dec*100):null;
@@ -924,7 +923,7 @@ function setResult(r){
 function setDirection(d){formDirection=d;document.getElementById('btn-long').className='toggle-btn'+(d==='long'?' long-a':'');document.getElementById('btn-short').className='toggle-btn'+(d==='short'?' short-a':'');}
 function setTimeframe(tf){
   formTimeframe=tf;
-  ['1m','3m','5m'].forEach(t=>{const btn=document.getElementById('btn-tf-'+t);if(btn)btn.className='toggle-btn'+(tf===t?' tf-a':'');});
+  ['3m','5m'].forEach(t=>{const btn=document.getElementById('btn-tf-'+t);if(btn)btn.className='toggle-btn'+(tf===t?' tf-a':'');});
 }
 function setBeTrigger(trig){
   formBeTrigger=trig;
